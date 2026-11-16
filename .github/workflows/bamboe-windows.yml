@@ -139,6 +139,10 @@ jobs:
           craft --options nextcloud-client.buildTests=False --options "[Packager]PackageType=PortablePackager" --src-dir ${{ github.workspace }} --package nextcloud-client
           $archive = "${{ github.workspace }}\${{ env.CRAFT_TARGET }}\build\nextcloud-client\archive"
           Get-ChildItem $archive | Format-Table Name
+          Write-Host "EXE in archive: $((Get-ChildItem $archive -Recurse -Filter *.exe | ForEach-Object { $_.FullName.Substring($archive.Length) }) -join ', ')"
+          $build = "${{ github.workspace }}\${{ env.CRAFT_TARGET }}\build\nextcloud-client"
+          Get-ChildItem $build -Recurse -Filter bamboedrive*.exe -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "FOUND $($_.FullName)" }
+          if (Test-Path "$build\blacklist.txt") { Write-Host "BLACKLIST:"; Get-Content "$build\blacklist.txt" }
           $exe = Get-ChildItem $archive -Recurse -Filter bamboedrive.exe | Select-Object -First 1
           if (-not $exe) { throw "bamboedrive.exe not found under $archive" }
           $msi = Get-ChildItem $archive -Recurse -Filter make-msi.bat | Select-Object -First 1
