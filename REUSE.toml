@@ -141,7 +141,7 @@ SPDX-FileCopyrightText = "2026 Nextcloud GmbH and Nextcloud contributors"
 SPDX-License-Identifier = "GPL-2.0-or-later"
 
 [[annotations]]
-path = ["BAMBOE.md", "theme/colored/BamboeDrive-icon.svg", "theme/colored/BamboeDrive-w10startmenu.svg", "theme/colored/BamboeDrive-w10starttile.png"]
+path = ["BAMBOE.md", "theme/colored/BamboeDrive-icon.svg", "theme/colored/BamboeDrive-w10startmenu.svg"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Ultimo Solution"
 SPDX-License-Identifier = "GPL-2.0-or-later"
