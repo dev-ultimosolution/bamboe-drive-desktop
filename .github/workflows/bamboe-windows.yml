@@ -130,6 +130,10 @@ jobs:
               python "${{ env.CRAFT_MASTER_LOCATION }}\CraftMaster.py" --config "${{ env.CRAFT_MASTER_CONFIG }}" --target ${{ env.CRAFT_TARGET }} -c $args
               if($LASTEXITCODE -ne 0) {exit $LASTEXITCODE}
           }
+          # Upstream blueprint uses os.path in createPackage() without importing os.
+          $blueprint = "${{ github.workspace }}\${{ env.CRAFT_TARGET }}\etc\blueprints\locations\craft-blueprints-nextcloud\nextcloud-client\nextcloud-client.py"
+          $text = Get-Content -Raw $blueprint
+          if ($text -notmatch '(?m)^import os\s*$') { Set-Content -NoNewline -Path $blueprint -Value ("import os`n" + $text) }
           # PortablePackager gathers the client plus every runtime dependency
           # into build\nextcloud-client\archive, which the MSI harvests.
           craft --options nextcloud-client.buildTests=False --options "[Packager]PackageType=PortablePackager" --src-dir ${{ github.workspace }} --package nextcloud-client
