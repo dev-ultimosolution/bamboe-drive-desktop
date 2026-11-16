@@ -1,32 +1,42 @@
-# SPDX-FileCopyrightText: 2022 Nextcloud GmbH and Nextcloud contributors
+# SPDX-FileCopyrightText: 2026 Ultimo Solution
 # SPDX-License-Identifier: GPL-2.0-or-later
-name: Windows Build and Test
+#
+# Builds the Bamboe Drive Windows installer (.msi).
+# Based on upstream nextcloud/desktop windows-build-and-test.yml.
+name: Bamboe Drive Windows
+
 on:
-  pull_request:
-    types: [opened, reopened, synchronize, ready_for_review, closed]
+  workflow_dispatch:
+  push:
+    tags: ['bamboe-v*']
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: write # attach the MSI to the GitHub release for tag builds
 
 jobs:
   build:
-    if: ${{ github.event.action != 'closed' && !github.event.pull_request.draft }}
-    name: Windows Build and Test
+    name: Build MSI
     runs-on: windows-2022
+    timeout-minutes: 360
     env:
       CRAFT_TARGET: windows-msvc2022_64-cl
       CRAFT_MASTER_LOCATION: ${{ github.workspace }}\CraftMaster
       CRAFT_MASTER_CONFIG: ${{ github.workspace }}\craftmaster.ini
       PYTHON_VERSION: '3.12'
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: ilammy/msvc-dev-cmd@v1 # uuidgen for make-msi.bat
 
       - name: Resolve Craft dependency revisions
         id: craft-revisions
@@ -35,24 +45,17 @@ jobs:
           function configValue($key) {
               $escapedKey = [regex]::Escape($key)
               $matches = @(Select-String -Path "${{ env.CRAFT_MASTER_CONFIG }}" -Pattern "^\s*$escapedKey\s*=\s*(.+?)\s*$")
-              if($matches.Count -ne 1) {
-                  throw "Expected exactly one $key value in craftmaster.ini."
-              }
+              if($matches.Count -ne 1) { throw "Expected exactly one $key value in craftmaster.ini." }
               return $matches[0].Matches[0].Groups[1].Value.Trim()
           }
-
           $craftRevision = configValue "CraftRevision"
           $kdeBlueprintRef = configValue "craft/craft-blueprints-kde.revision"
           $nextcloudBlueprintRef = configValue "craft/craft-blueprints-nextcloud.revision"
-
           function remoteRevision($repository, $ref) {
               $revision = git ls-remote $repository $ref
-              if($LASTEXITCODE -ne 0 -or !$revision) {
-                  throw "Could not resolve $ref from $repository."
-              }
+              if($LASTEXITCODE -ne 0 -or !$revision) { throw "Could not resolve $ref from $repository." }
               return ($revision -split '\s+')[0]
           }
-
           $kdeBlueprintRevision = remoteRevision "https://github.com/nextcloud/craft-blueprints-kde.git" "refs/heads/$kdeBlueprintRef"
           $nextcloudBlueprintRevision = remoteRevision "https://github.com/nextcloud/craft-blueprints-nextcloud.git" "refs/heads/$nextcloudBlueprintRef"
           @(
@@ -63,60 +66,54 @@ jobs:
 
       - name: Restore Craft dependencies
         id: craft-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@v4
         with:
           path: |
             ${{ env.CRAFT_MASTER_LOCATION }}
             ${{ env.CRAFT_MASTER_CONFIG }}
             ${{ github.workspace }}\craft-clone
             ${{ github.workspace }}\${{ env.CRAFT_TARGET }}
-          key: ${{ runner.os }}-craft-v1-${{ env.CRAFT_TARGET }}-python-${{ env.PYTHON_VERSION }}-${{ steps.craft-revisions.outputs.key }}
+          key: ${{ runner.os }}-bamboe-craft-v1-${{ env.CRAFT_TARGET }}-python-${{ env.PYTHON_VERSION }}-${{ steps.craft-revisions.outputs.key }}
 
-      - name: Install Craft Master with Nextcloud Client Deps
+      - name: Install Craft Master with client dependencies
         if: steps.craft-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           & cmd /C "git clone -q --depth=1 https://github.com/KDE/craftmaster.git ${{ env.CRAFT_MASTER_LOCATION }} 2>&1"
-          
           function craft() {
               python "${{ env.CRAFT_MASTER_LOCATION }}\CraftMaster.py" --config "${{ env.CRAFT_MASTER_CONFIG }}" --target ${{ env.CRAFT_TARGET }} -c $args
               if($LASTEXITCODE -ne 0) {exit $LASTEXITCODE}
           }
-          
           craft --add-blueprint-repository "https://github.com/nextcloud/craft-blueprints-kde.git|${{ steps.craft-revisions.outputs.kde_ref }}|"
           craft --add-blueprint-repository "https://github.com/nextcloud/craft-blueprints-nextcloud.git|${{ steps.craft-revisions.outputs.nextcloud_ref }}|"
           craft craft
           craft --install-deps nextcloud-client
-          
+
       - name: Save Craft dependencies
         if: steps.craft-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/save@v4
         with:
           path: |
             ${{ env.CRAFT_MASTER_LOCATION }}
             ${{ env.CRAFT_MASTER_CONFIG }}
             ${{ github.workspace }}\craft-clone
             ${{ github.workspace }}\${{ env.CRAFT_TARGET }}
-          key: ${{ runner.os }}-craft-v1-${{ env.CRAFT_TARGET }}-python-${{ env.PYTHON_VERSION }}-${{ steps.craft-revisions.outputs.key }}
+          key: ${{ runner.os }}-bamboe-craft-v1-${{ env.CRAFT_TARGET }}-python-${{ env.PYTHON_VERSION }}-${{ steps.craft-revisions.outputs.key }}
 
-      #- name: Cache Install inkscape
-      #  id: cache-install-inkscape
-      #  uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-      #  with:
-      #    path: C:\Program Files\inkscape
-      #    key: ${{ runner.os }}-cache-install-inkscape
-
-      - name: Install inkscape
-      #  if: steps.cache-install-inkscape.outputs.cache-hit != 'true'
+      - name: Install Inkscape and WiX Toolset 3
         shell: pwsh
         run: |
-          choco install inkscape
+          choco install inkscape -y --no-progress
+          choco install wixtoolset -y --no-progress
+          $wix = (Get-ChildItem "C:\Program Files (x86)" -Directory -Filter "WiX Toolset v3*" | Select-Object -First 1).FullName
+          if (-not $wix) { throw "WiX Toolset v3 not found" }
+          "WIX=$wix\" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Setup PATH
         shell: pwsh
         run: |
           echo "${{ github.workspace }}\${{ env.CRAFT_TARGET }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-   
+
       - name: Compile
         shell: pwsh
         run: |
@@ -124,20 +121,42 @@ jobs:
               python "${{ env.CRAFT_MASTER_LOCATION }}\CraftMaster.py" --config "${{ env.CRAFT_MASTER_CONFIG }}" --target ${{ env.CRAFT_TARGET }} -c $args
               if($LASTEXITCODE -ne 0) {exit $LASTEXITCODE}
           }
-          
-          craft --src-dir ${{ github.workspace }} nextcloud-client
-          
-      - name: Run tests
+          craft --options nextcloud-client.buildTests=False --src-dir ${{ github.workspace }} nextcloud-client
+
+      - name: Collect application files
         shell: pwsh
         run: |
-          function runTests() {
-              $buildFolder = "${{ github.workspace }}\${{ env.CRAFT_TARGET }}\build\nextcloud-client\work\build"
-
-              cd $buildFolder
-
-              $binFolder = "$buildFolder\bin"
-
-              & ctest --output-on-failure --timeout 300
+          function craft() {
+              python "${{ env.CRAFT_MASTER_LOCATION }}\CraftMaster.py" --config "${{ env.CRAFT_MASTER_CONFIG }}" --target ${{ env.CRAFT_TARGET }} -c $args
+              if($LASTEXITCODE -ne 0) {exit $LASTEXITCODE}
           }
-          
-          runTests
+          # PortablePackager gathers the client plus every runtime dependency
+          # into build\nextcloud-client\archive, which the MSI harvests.
+          craft --options nextcloud-client.buildTests=False --options "[Packager]PackageType=PortablePackager" --src-dir ${{ github.workspace }} --package nextcloud-client
+          $archive = "${{ github.workspace }}\${{ env.CRAFT_TARGET }}\build\nextcloud-client\archive"
+          if (-not (Test-Path "$archive\bamboedrive.exe")) {
+              Get-ChildItem "${{ github.workspace }}\${{ env.CRAFT_TARGET }}\build\nextcloud-client" | Format-Table Name
+              throw "bamboedrive.exe not found in $archive"
+          }
+          "APP_DIR=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build MSI
+        shell: cmd
+        run: |
+          cd /d "%APP_DIR%\msi"
+          call make-msi.bat "%APP_DIR%"
+          if errorlevel 1 exit /b 1
+          dir *.msi
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bamboe-drive-windows
+          path: ${{ env.APP_DIR }}\msi\*.msi
+          if-no-files-found: error
+
+      - name: Attach MSI to release
+        if: startsWith(github.ref, 'refs/tags/bamboe-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.APP_DIR }}\msi\*.msi

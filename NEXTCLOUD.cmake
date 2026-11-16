@@ -10,17 +10,17 @@ if(NEXTCLOUD_DEV)
     set( APPLICATION_EXECUTABLE "nextclouddev" )
     set( APPLICATION_ICON_NAME  "Nextcloud" )
 else()
-    set( APPLICATION_NAME       "Nextcloud" )
-    set( APPLICATION_SHORTNAME  "Nextcloud" )
-    set( APPLICATION_EXECUTABLE "nextcloud" )
+    set( APPLICATION_NAME       "Bamboe Drive" )
+    set( APPLICATION_SHORTNAME  "BamboeDrive" )
+    set( APPLICATION_EXECUTABLE "bamboedrive" )
     set( APPLICATION_ICON_NAME  "${APPLICATION_SHORTNAME}" )
 endif()
 
 set( APPLICATION_CONFIG_NAME "${APPLICATION_EXECUTABLE}" )
-set( APPLICATION_DOMAIN     "nextcloud.com" )
-set( APPLICATION_VENDOR     "Nextcloud GmbH" )
-set( APPLICATION_UPDATE_URL "https://updates.nextcloud.org/client/" CACHE STRING "URL for updater" )
-set( APPLICATION_HELP_URL   "" CACHE STRING "URL for the help menu" )
+set( APPLICATION_DOMAIN     "bamboemail.com" )
+set( APPLICATION_VENDOR     "Ultimo Solution" )
+set( APPLICATION_UPDATE_URL "https://bamboemail.com/drive/desktop/update/" CACHE STRING "URL for updater" )
+set( APPLICATION_HELP_URL   "https://bamboemail.com/#support" CACHE STRING "URL for the help menu" )
 
 # Default macOS builds (Nextcloud + NextcloudDev) use the Icon Composer (.icon)
 # format for the app icon. That format can only be compiled by a recent enough
@@ -79,16 +79,16 @@ if(APPLE)
 endif()
 
 set( APPLICATION_ICON_SET   "SVG" )
-set( APPLICATION_SERVER_URL "" CACHE STRING "URL for the server to use. If entered, the UI field will be pre-filled with it" )
+set( APPLICATION_SERVER_URL "https://drive.bamboemail.com" CACHE STRING "URL for the server to use. If entered, the UI field will be pre-filled with it" )
 set( APPLICATION_SERVER_URL_ENFORCE ON ) # If set and APPLICATION_SERVER_URL is defined, the server can only connect to the pre-defined URL
-set( APPLICATION_REV_DOMAIN "com.nextcloud.desktopclient" )
-set( APPLICATION_REV_DOMAIN_DBUS "desktopclient.nextcloud.com" )
+set( APPLICATION_REV_DOMAIN "com.bamboemail.drive" )
+set( APPLICATION_REV_DOMAIN_DBUS "drive.bamboemail.com" )
 set( DEVELOPMENT_TEAM "NKUJUXUJ3B" CACHE STRING "Apple Development Team ID" )
-set( APPLICATION_VIRTUALFILE_SUFFIX "nextcloud" CACHE STRING "Virtual file suffix (not including the .)")
+set( APPLICATION_VIRTUALFILE_SUFFIX "bamboedrive" CACHE STRING "Virtual file suffix (not including the .)")
 set( APPLICATION_OCSP_STAPLING_ENABLED OFF )
 set( APPLICATION_FORBID_BAD_SSL OFF )
 
-set( LINUX_PACKAGE_SHORTNAME "nextcloud" )
+set( LINUX_PACKAGE_SHORTNAME "bamboedrive" )
 set( LINUX_APPLICATION_ID "${APPLICATION_REV_DOMAIN}.${LINUX_PACKAGE_SHORTNAME}")
 
 set( THEME_CLASS            "NextcloudTheme" )
@@ -102,7 +102,7 @@ set( MAC_INSTALLER_BACKGROUND_FILE "${CMAKE_SOURCE_DIR}/admin/osx/installer-back
 ## Updater options
 option( BUILD_UPDATER "Build updater" ON )
 
-option( WITH_PROVIDERS "Build with providers list" ON )
+option( WITH_PROVIDERS "Build with providers list" OFF )
 
 option( ENFORCE_VIRTUAL_FILES_SYNC_FOLDER "Enforce use of virtual files sync folder when available" OFF )
 option( DISABLE_VIRTUAL_FILES_SYNC_FOLDER "Disable use of virtual files sync folder even when available" OFF )
@@ -114,7 +114,7 @@ option( DO_NOT_USE_PROXY "Do not use system wide proxy, instead always do a dire
 option( WIN_DISABLE_USERNAME_PREFILL "Do not prefill the Windows user name when creating a new account" OFF )
 
 ## Theming options
-set(NEXTCLOUD_BACKGROUND_COLOR "#0082c9" CACHE STRING "Default Nextcloud background color")
+set(NEXTCLOUD_BACKGROUND_COLOR "#4a9e2b" CACHE STRING "Default Nextcloud background color")
 set( APPLICATION_WIZARD_HEADER_BACKGROUND_COLOR ${NEXTCLOUD_BACKGROUND_COLOR} CACHE STRING "Hex color of the wizard header background")
 set( APPLICATION_WIZARD_HEADER_TITLE_COLOR "#ffffff" CACHE STRING "Hex color of the text in the wizard header")
 option( APPLICATION_WIZARD_USE_CUSTOM_LOGO "Use the logo from ':/client/theme/colored/wizard_logo.(png|svg)' else the default application icon is used" ON )
@@ -124,20 +124,22 @@ option( APPLICATION_WIZARD_USE_CUSTOM_LOGO "Use the logo from ':/client/theme/co
 #
 if(WIN32)
     # Context Menu
-    set( WIN_SHELLEXT_CONTEXT_MENU_GUID      "{BC6988AB-ACE2-4B81-84DC-DC34F9B24401}" )
+    set( WIN_SHELLEXT_CONTEXT_MENU_GUID      "{945B3022-50DE-466D-958D-EA354953CD65}" )
 
     # Overlays
-    set( WIN_SHELLEXT_OVERLAY_GUID_ERROR     "{E0342B74-7593-4C70-9D61-22F294AAFE05}" )
-    set( WIN_SHELLEXT_OVERLAY_GUID_OK        "{E1094E94-BE93-4EA2-9639-8475C68F3886}" )
-    set( WIN_SHELLEXT_OVERLAY_GUID_OK_SHARED "{E243AD85-F71B-496B-B17E-B8091CBE93D2}" )
-    set( WIN_SHELLEXT_OVERLAY_GUID_SYNC      "{E3D6DB20-1D83-4829-B5C9-941B31C0C35A}" )
-    set( WIN_SHELLEXT_OVERLAY_GUID_WARNING   "{E4977F33-F93A-4A0A-9D3C-83DEA0EE8483}" )
+    set( WIN_SHELLEXT_OVERLAY_GUID_ERROR     "{A5CBF54A-DE84-4BF6-AEE0-B2E6E54F6D97}" )
+    set( WIN_SHELLEXT_OVERLAY_GUID_OK        "{B556062B-FC55-4AB0-B0E5-24D9A22E7D75}" )
+    set( WIN_SHELLEXT_OVERLAY_GUID_OK_SHARED "{6B49D243-4458-4A94-BFF4-948330F47CB4}" )
+    set( WIN_SHELLEXT_OVERLAY_GUID_SYNC      "{6917BE94-9020-4C23-8549-A933B9B5DFEB}" )
+    set( WIN_SHELLEXT_OVERLAY_GUID_WARNING   "{C270BB7B-76DD-48C3-8AAE-11AC6977362B}" )
 
     # MSI Upgrade Code (without brackets)
-    set( WIN_MSI_UPGRADE_CODE                "FD2FCCA9-BB8F-4485-8F70-A0621B84A7F4" )
+    # BAMBOE: NEVER CHANGE. Every Bamboe Drive release must keep this code so
+    # newer installers upgrade in place (no uninstall, sync settings kept).
+    set( WIN_MSI_UPGRADE_CODE                "AEB4B2AE-51BC-4CCC-ABC7-4175D6961A9B" )
 
     # Windows build options
-    option( BUILD_WIN_MSI "Build MSI scripts and helper DLL" OFF )
+    option( BUILD_WIN_MSI "Build MSI scripts and helper DLL" ON )
     option( BUILD_WIN_TOOLS "Build Win32 migration tools" OFF )
 endif()
 
