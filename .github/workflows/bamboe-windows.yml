@@ -134,6 +134,14 @@ jobs:
           $blueprint = "${{ github.workspace }}\${{ env.CRAFT_TARGET }}\etc\blueprints\locations\craft-blueprints-nextcloud\nextcloud-client\nextcloud-client.py"
           $text = Get-Content -Raw $blueprint
           if ($text -notmatch '(?m)^import os\s*$') { Set-Content -NoNewline -Path $blueprint -Value ("import os`n" + $text) }
+          # The blueprint blacklist strips every bin\*.exe except nextcloud*.exe; keep ours.
+          $blacklist = Join-Path (Split-Path $blueprint) "blacklist.txt"
+          $bl = Get-Content -Raw $blacklist
+          if ($bl -notmatch 'bamboedrive') {
+              $bl = $bl.Replace('(?!(nextcloud|nextcloudcmd|', '(?!(bamboedrive|bamboedrivecmd|nextcloud|nextcloudcmd|')
+              if ($bl -notmatch 'bamboedrive') { throw "Could not patch $blacklist" }
+              Set-Content -NoNewline -Path $blacklist -Value $bl
+          }
           # PortablePackager gathers the client plus every runtime dependency
           # into build\nextcloud-client\archive, which the MSI harvests.
           craft --options nextcloud-client.buildTests=False --options "[Packager]PackageType=PortablePackager" --src-dir ${{ github.workspace }} --package nextcloud-client
