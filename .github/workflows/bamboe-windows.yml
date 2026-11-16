@@ -188,7 +188,7 @@ jobs:
           $out | Format-Table Name, Length
 
       - name: Upload MSI artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bamboe-drive-windows
           path: ${{ env.MSI_DIR }}\*.msi
