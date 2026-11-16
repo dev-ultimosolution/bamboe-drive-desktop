@@ -28,7 +28,7 @@ jobs:
       CRAFT_MASTER_CONFIG: ${{ github.workspace }}\craftmaster.ini
       PYTHON_VERSION: '3.12'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
