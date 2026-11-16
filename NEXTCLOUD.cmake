@@ -19,7 +19,7 @@ endif()
 set( APPLICATION_CONFIG_NAME "${APPLICATION_EXECUTABLE}" )
 set( APPLICATION_DOMAIN     "bamboemail.com" )
 set( APPLICATION_VENDOR     "Ultimo Solution" )
-set( APPLICATION_UPDATE_URL "https://bamboemail.com/drive/desktop/update/" CACHE STRING "URL for updater" )
+set( APPLICATION_UPDATE_URL "https://bamboemail.com/drive/desktop/update" CACHE STRING "URL for updater" )
 set( APPLICATION_HELP_URL   "https://bamboemail.com/#support" CACHE STRING "URL for the help menu" )
 
 # Default macOS builds (Nextcloud + NextcloudDev) use the Icon Composer (.icon)
