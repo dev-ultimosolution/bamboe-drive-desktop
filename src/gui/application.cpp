@@ -21,6 +21,7 @@
 #include "pushnotifications.h"
 #include "socketapi/socketapi.h"
 #include "theme.h"
+#include "tray/usermodel.h"
 #include "urischemehandler.h"
 
 #if defined(BUILD_UPDATER)
@@ -738,6 +739,13 @@ void Application::showMainDialogRemoteCommand()
     if (_startedAt.elapsed() < 10 * 1000) {
         // This call is mirrored with the one in int main()
         qCWarning(lcApplication) << "Ignoring MSG_SHOWMAINDIALOG, possibly double-invocation of client via session restore and auto start";
+        return;
+    }
+
+    // Bamboe Drive: launching the app again (desktop/start-menu shortcut) while it is
+    // already running opens the local sync folder, like Dropbox. Settings stay in the tray menu.
+    if (const auto user = UserModel::instance()->currentUser(); user && user->hasLocalFolder()) {
+        user->openLocalFolder();
         return;
     }
 
