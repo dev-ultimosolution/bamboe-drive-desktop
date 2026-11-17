@@ -22,6 +22,7 @@
 #include "networkjobs.h"
 
 class QNetworkReply;
+class QNetworkAccessManager;
 
 namespace OCC {
 
@@ -43,6 +44,8 @@ class AccountWizardController : public QObject
     Q_PROPERTY(bool serverUrlEditable READ serverUrlEditable NOTIFY serverUrlEditableChanged)
     Q_PROPERTY(bool overrideServerSelectionRequired READ overrideServerSelectionRequired NOTIFY overrideServerSelectionChanged)
     Q_PROPERTY(bool startLoginFlowAutomatically READ startLoginFlowAutomatically CONSTANT)
+    // Bamboe: ask for the email (domain map lookup) once there are several Drive servers.
+    Q_PROPERTY(bool emailLookupMode READ emailLookupMode NOTIFY emailLookupModeChanged)
     Q_PROPERTY(QStringList overrideServerNames READ overrideServerNames NOTIFY overrideServerSelectionChanged)
     Q_PROPERTY(int overrideServerIndex READ overrideServerIndex WRITE setOverrideServerIndex NOTIFY overrideServerSelectionChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
@@ -119,6 +122,7 @@ public:
     [[nodiscard]] bool serverUrlEditable() const;
     [[nodiscard]] bool overrideServerSelectionRequired() const;
     [[nodiscard]] bool startLoginFlowAutomatically() const;
+    [[nodiscard]] bool emailLookupMode() const;
     [[nodiscard]] QStringList overrideServerNames() const;
     [[nodiscard]] int overrideServerIndex() const;
     void setOverrideServerIndex(int index);
@@ -209,6 +213,7 @@ public:
     Q_INVOKABLE void useClientCertificateForSecureConnection();
 
 Q_SIGNALS:
+    void emailLookupModeChanged();
     void currentStepChanged();
     void serverUrlChanged();
     void serverUrlEditableChanged();
@@ -323,6 +328,17 @@ private:
         ProxyAuthentication _needsAuth = ProxyAuthentication::NoAuthentication;
         QNetworkProxy::ProxyType _proxyType = QNetworkProxy::NoProxy;
     };
+    // Bamboe domain map (api.bamboemail.com/drive)
+    [[nodiscard]] bool bamboeLookupEnabled() const;
+    void bamboeCheckDriveServers();
+    void bamboeLookupEmail(const QString &email);
+    QNetworkAccessManager *bamboeNetwork();
+    QNetworkAccessManager *_bamboeNam = nullptr;
+    bool _bamboeServersChecked = false;
+    bool _emailLookupMode = false;
+    bool _bamboeServerResolved = false;
+    QString _bamboeEmail;
+
     Step _currentStep = ServerStep;
     QString _serverUrl;
     bool _serverUrlEditable = true;

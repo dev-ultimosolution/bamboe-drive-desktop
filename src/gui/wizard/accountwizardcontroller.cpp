@@ -51,6 +51,8 @@
 #include <QSslCertificate>
 #include <QStorageInfo>
 #include <QTimer>
+#include <QSet>
+#include <QRegularExpression>
 #include <QUuid>
 
 using namespace Qt::StringLiterals;
@@ -204,6 +206,122 @@ bool AccountWizardController::startLoginFlowAutomatically() const
         && !_serverUrl.isEmpty()
         && !Theme::instance()->multipleOverrideServers()
         && !overrideServerSelectionRequired();
+}
+
+bool AccountWizardController::emailLookupMode() const
+{
+    return _emailLookupMode;
+}
+
+namespace {
+const auto bamboeDirectoryUrl = QStringLiteral("https://api.bamboemail.com/drive");
+
+// Only https Drive servers on *.bamboemail.com are accepted from the directory.
+QUrl bamboeSafeDriveUrl(const QString &value)
+{
+    const QUrl url(value.trimmed(), QUrl::StrictMode);
+    const auto host = url.host().toLower();
+    if (!url.isValid() || url.scheme() != "https"_L1 || !url.userInfo().isEmpty() || url.hasQuery()
+        || url.hasFragment() || (!url.path().isEmpty() && url.path() != "/"_L1)
+        || !host.endsWith(".bamboemail.com"_L1)) {
+        return {};
+    }
+    QUrl clean;
+    clean.setScheme(QStringLiteral("https"));
+    clean.setHost(host);
+    if (url.port() > 0) {
+        clean.setPort(url.port());
+    }
+    return clean;
+}
+}
+
+bool AccountWizardController::bamboeLookupEnabled() const
+{
+    return Theme::instance()->forceOverrideServerUrl() && !Theme::instance()->multipleOverrideServers()
+        && !overrideServerSelectionRequired()
+        && QUrl(Theme::instance()->overrideServerUrl()).host().toLower().endsWith(".bamboemail.com"_L1);
+}
+
+QNetworkAccessManager *AccountWizardController::bamboeNetwork()
+{
+    if (!_bamboeNam) {
+        _bamboeNam = new QNetworkAccessManager(this);
+    }
+    return _bamboeNam;
+}
+
+void AccountWizardController::bamboeCheckDriveServers()
+{
+    setBusy(true);
+    setErrorText({});
+    QNetworkRequest request(QUrl(bamboeDirectoryUrl + "/servers"_L1));
+    request.setTransferTimeout(10000);
+    request.setRawHeader("Accept", "application/json");
+    auto *reply = bamboeNetwork()->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply] {
+        reply->deleteLater();
+        _bamboeServersChecked = true;
+        setBusy(false);
+        QSet<QString> servers;
+        if (reply->error() == QNetworkReply::NoError) {
+            const auto array = QJsonDocument::fromJson(reply->readAll()).object().value("servers"_L1).toArray();
+            for (const auto &value : array) {
+                const auto url = bamboeSafeDriveUrl(value.toString());
+                if (url.isValid() && !url.isEmpty()) {
+                    servers.insert(url.toString());
+                }
+            }
+        }
+        if (servers.size() <= 1) {
+            // One Drive (or directory unreachable): keep opening the login directly.
+            qCInfo(lcAccountWizardController) << "Bamboe: single Drive server, starting login directly";
+            submitServerUrl();
+            return;
+        }
+        qCInfo(lcAccountWizardController) << "Bamboe:" << servers.size() << "Drive servers, asking for the email";
+        _emailLookupMode = true;
+        Q_EMIT emailLookupModeChanged();
+        setServerUrlEditable(true);
+        setServerUrl(_bamboeEmail);
+    });
+}
+
+void AccountWizardController::bamboeLookupEmail(const QString &email)
+{
+    static const QRegularExpression emailPattern(QStringLiteral(R"(^[^\s@]+@[^\s@]+\.[^\s@]+$)"));
+    if (!emailPattern.match(email).hasMatch()) {
+        setErrorText(tr("Enter your email address."));
+        return;
+    }
+    _bamboeEmail = email;
+    setBusy(true);
+    setErrorText({});
+    QUrl url(bamboeDirectoryUrl + "/lookup"_L1);
+    url.setQuery("email="_L1 + QString::fromLatin1(QUrl::toPercentEncoding(email)), QUrl::StrictMode);
+    QNetworkRequest request(url);
+    request.setTransferTimeout(10000);
+    request.setRawHeader("Accept", "application/json");
+    auto *reply = bamboeNetwork()->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply] {
+        reply->deleteLater();
+        setBusy(false);
+        const auto status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (status == 404) {
+            setErrorText(tr("There is no %1 for this email address.").arg(Theme::instance()->appNameGUI()));
+            return;
+        }
+        const auto drive = reply->error() == QNetworkReply::NoError
+            ? bamboeSafeDriveUrl(QJsonDocument::fromJson(reply->readAll()).object().value("drive"_L1).toString())
+            : QUrl{};
+        if (!drive.isValid() || drive.isEmpty()) {
+            setErrorText(tr("Could not look up your server. Check your internet connection and try again."));
+            return;
+        }
+        setServerUrl(drive.toString());
+        _bamboeServerResolved = true;
+        submitServerUrl();
+    });
 }
 
 QStringList AccountWizardController::overrideServerNames() const
@@ -668,6 +786,17 @@ void AccountWizardController::submitServerUrl()
 {
     if (_busy) {
         return;
+    }
+
+    if (bamboeLookupEnabled() && !_bamboeServerResolved) {
+        if (!_bamboeServersChecked) {
+            bamboeCheckDriveServers();
+            return;
+        }
+        if (_emailLookupMode) {
+            bamboeLookupEmail(_serverUrl.trimmed());
+            return;
+        }
     }
 
     if (!proxySettingsValid()) {
@@ -1213,6 +1342,11 @@ void AccountWizardController::goBack()
         setCurrentStep(ServerStep);
         setBusy(false);
         setAuthStatusText({});
+        if (_emailLookupMode) {
+            // Back on the email field: show the email again, look it up again on submit.
+            _bamboeServerResolved = false;
+            setServerUrl(_bamboeEmail);
+        }
     }
 }
 

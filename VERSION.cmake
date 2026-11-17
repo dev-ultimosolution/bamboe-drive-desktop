@@ -38,7 +38,7 @@ if(NOT DEFINED MIRALL_VERSION_SUFFIX)
 endif()
 
 if(NOT DEFINED MIRALL_VERSION_BUILD)
-    set(MIRALL_VERSION_BUILD "3")       # Bamboe Drive release number; bump for every release (updater compares it)
+    set(MIRALL_VERSION_BUILD "4")       # Bamboe Drive release number; bump for every release (updater compares it)
 endif()
 
 # ------------------------------------

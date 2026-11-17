@@ -35,7 +35,9 @@ Item {
         }
 
         EnforcedPlainTextLabel {
-            text: qsTr("Enter the link to your %1 web interface from the browser or the link to a folder shared with you.").arg(root.controller.appName)
+            text: root.controller.emailLookupMode
+                  ? qsTr("Enter your email address to find your %1.").arg(root.controller.appName)
+                  : qsTr("Enter the link to your %1 web interface from the browser or the link to a folder shared with you.").arg(root.controller.appName)
             color: root.hintTextColor
             font.pixelSize: Style.pixelSize + 2
             Layout.fillWidth: true
@@ -59,8 +61,8 @@ Item {
                     text: root.controller.serverUrl
                     enabled: !root.controller.busy
                     readOnly: !root.controller.serverUrlEditable
-                    placeholderText: root.controller.serverUrlPlaceholder
-                    inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoAutoUppercase
+                    placeholderText: root.controller.emailLookupMode ? "name@company.com" : root.controller.serverUrlPlaceholder
+                    inputMethodHints: (root.controller.emailLookupMode ? Qt.ImhEmailCharactersOnly : Qt.ImhUrlCharactersOnly) | Qt.ImhNoAutoUppercase
                     selectByMouse: true
                     onTextEdited: root.controller.serverUrl = text
                     onAccepted: root.controller.submitServerUrl()
