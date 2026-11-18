@@ -273,13 +273,14 @@ void AccountWizardController::bamboeCheckDriveServers()
                 }
             }
         }
-        if (servers.size() <= 1) {
-            // One Drive (or directory unreachable): keep opening the login directly.
-            qCInfo(lcAccountWizardController) << "Bamboe: single Drive server, starting login directly";
+        if (servers.isEmpty()) {
+            // Directory unreachable: fall back to the built-in Drive server and open the login directly.
+            qCInfo(lcAccountWizardController) << "Bamboe: Drive directory unreachable, starting login directly";
             submitServerUrl();
             return;
         }
-        qCInfo(lcAccountWizardController) << "Bamboe:" << servers.size() << "Drive servers, asking for the email";
+        // Always ask for the email first; the server comes from the domain map (/drive/lookup).
+        qCInfo(lcAccountWizardController) << "Bamboe:" << servers.size() << "Drive server(s), asking for the email";
         _emailLookupMode = true;
         Q_EMIT emailLookupModeChanged();
         setServerUrlEditable(true);
