@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
 # Builds the Bamboe Drive macOS app with upstream's mac-crafter (KDE Craft).
-# Stage 1: unsigned Apple Silicon test build, uploaded as a workflow artifact.
+# Stage 1: unsigned test builds (Apple Silicon and Intel), uploaded as a workflow artifact.
 # Signing, notarisation, the Intel/universal build and the installer follow later.
 name: Bamboe Drive macOS
 
@@ -20,12 +20,16 @@ permissions:
 
 jobs:
   build:
-    name: Build app (arm64, unsigned)
+    name: Build app (${{ matrix.arch }}, unsigned)
     runs-on: macos-26
     timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x86_64]
     env:
       APP_NAME: Bamboe Drive
-      ARCH: arm64
+      ARCH: ${{ matrix.arch }}
       BUILD_PATH: ${{ github.workspace }}/mc-build
       PRODUCT_PATH: ${{ github.workspace }}/mc-product
       BLUEPRINT_REF: stable-34.0
@@ -89,6 +93,9 @@ jobs:
           ls "$APP/Contents/MacOS" | head -40
           lipo -archs "$APP/Contents/MacOS/"* 2>/dev/null | sort | uniq -c
           codesign -dv "$APP" 2>&1 | head -20 || true
+          # The command line tool must resolve its libraries inside the bundle.
+          otool -L "$APP/Contents/MacOS/bamboedrivecmd" | head -30
+          if otool -L "$APP/Contents/MacOS/bamboedrivecmd" | grep -q "$BUILD_PATH"; then echo "bamboedrivecmd still links into the build tree"; exit 1; fi
           ditto -c -k --sequesterRsrc --keepParent "$APP" "$PRODUCT_PATH/BamboeDrive-macos-$ARCH-unsigned.zip"
           shasum -a 256 "$PRODUCT_PATH"/*.zip
 

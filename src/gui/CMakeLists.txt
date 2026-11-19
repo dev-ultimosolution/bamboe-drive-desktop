@@ -823,7 +823,7 @@ if(BUILD_OWNCLOUD_OSX_BUNDLE AND NOT BUILD_LIBRARIES_ONLY)
         "$<TARGET_FILE_DIR:nextcloud>/../.."
         -qmldir=${CMAKE_SOURCE_DIR}/src/gui
         -always-overwrite
-        -executable="$<TARGET_FILE_DIR:nextcloud>/${cmd_NAME}"
+        "-executable=$<TARGET_FILE_DIR:nextcloud>/${cmd_NAME}"
         -libpath=${MACDEPLOYQT_LIB_DIR}
         -libpath=${BIN_OUTPUT_DIRECTORY}
         ${NO_STRIP}
