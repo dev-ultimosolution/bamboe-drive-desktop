@@ -1,0 +1,108 @@
+# SPDX-FileCopyrightText: 2026 Ultimo Solution
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Builds the Bamboe Drive macOS app with upstream's mac-crafter (KDE Craft).
+# Stage 1: unsigned Apple Silicon test build, uploaded as a workflow artifact.
+# Signing, notarisation, the Intel/universal build and the installer follow later.
+name: Bamboe Drive macOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['macos-build']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build app (arm64, unsigned)
+    runs-on: macos-26
+    timeout-minutes: 300
+    env:
+      APP_NAME: Bamboe Drive
+      ARCH: arm64
+      BUILD_PATH: ${{ github.workspace }}/mc-build
+      PRODUCT_PATH: ${{ github.workspace }}/mc-product
+      BLUEPRINT_REF: stable-34.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      # craftmaster.ini pins Paths/Python for macos-clang-arm64 to this exact version.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.3'
+
+      - name: Tool versions
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+          python3 --version
+
+      - name: Install Inkscape
+        run: brew install homebrew/cask/inkscape
+
+      - name: Restore Craft dependencies
+        id: craft-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.BUILD_PATH }}
+          key: ${{ runner.os }}-bamboe-maccrafter-v1-${{ env.ARCH }}-${{ env.BLUEPRINT_REF }}-${{ hashFiles('craftmaster.ini') }}
+
+      - name: Build
+        working-directory: admin/osx/mac-crafter
+        run: |
+          swift run mac-crafter build "${{ github.workspace }}" \
+            --arch "$ARCH" \
+            --app-name "$APP_NAME" \
+            --build-path "$BUILD_PATH" \
+            --product-path "$PRODUCT_PATH" \
+            --kde-blueprints-git-ref "$BLUEPRINT_REF" \
+            --client-blueprints-git-ref "$BLUEPRINT_REF" \
+            --disable-auto-updater
+
+      - name: Save Craft dependencies
+        if: always() && steps.craft-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.BUILD_PATH }}
+          key: ${{ runner.os }}-bamboe-maccrafter-v1-${{ env.ARCH }}-${{ env.BLUEPRINT_REF }}-${{ hashFiles('craftmaster.ini') }}
+
+      - name: Inspect app bundle
+        run: |
+          APP="$PRODUCT_PATH/$APP_NAME.app"
+          ls -la "$PRODUCT_PATH"
+          test -d "$APP"
+          /usr/libexec/PlistBuddy -c Print "$APP/Contents/Info.plist" | head -60
+          ls "$APP/Contents/MacOS" | head -40
+          lipo -archs "$APP/Contents/MacOS/"* 2>/dev/null | sort | uniq -c
+          codesign -dv "$APP" 2>&1 | head -20 || true
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "$PRODUCT_PATH/BamboeDrive-macos-$ARCH-unsigned.zip"
+          shasum -a 256 "$PRODUCT_PATH"/*.zip
+
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: bamboe-drive-macos-${{ env.ARCH }}-unsigned
+          path: ${{ env.PRODUCT_PATH }}/*.zip
+          if-no-files-found: error
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-crafter-logs
+          path: ~/Library/Logs/mac-crafter
+          if-no-files-found: ignore
