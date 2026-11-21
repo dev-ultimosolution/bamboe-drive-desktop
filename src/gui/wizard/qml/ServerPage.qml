@@ -195,7 +195,7 @@ Item {
                 EnforcedPlainTextLabel {
                     id: serverAddressLabel
                     anchors.centerIn: parent
-                    text: qsTr("Server address")
+                    text: root.controller.emailLookupMode ? qsTr("Email address") : qsTr("Server address")
                     color: root.hintTextColor
                     font.pixelSize: Style.pixelSize
                 }
