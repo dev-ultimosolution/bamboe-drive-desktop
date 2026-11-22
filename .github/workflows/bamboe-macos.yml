@@ -57,7 +57,13 @@ jobs:
           python3 --version
 
       - name: Install Inkscape
-        run: brew install homebrew/cask/inkscape
+        run: |
+          # The download from inkscape.org fails now and then; try a few times.
+          for attempt in 1 2 3; do
+            brew install homebrew/cask/inkscape && exit 0
+            sleep 30
+          done
+          exit 1
 
       - name: Restore Craft dependencies
         id: craft-cache
@@ -163,9 +169,9 @@ jobs:
       - name: Create disk image
         run: |
           APP="universal/$APP_NAME.app"
-          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")
-          BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Contents/Info.plist")
-          DMG="BamboeDrive-$VERSION.$BUILD-macos-universal-unsigned.dmg"
+          # CFBundleVersion is the full four-part version (e.g. 34.0.7.5).
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Contents/Info.plist")
+          DMG="BamboeDrive-$VERSION-macos-universal-unsigned.dmg"
           brew install create-dmg
           # create-dmg arranges the window with Finder, which can fail on a CI runner; fall back to a plain image.
           if ! create-dmg --volname "$APP_NAME" --filesystem APFS --app-drop-link 513 37 --window-size 787 276 "$DMG" "$APP"; then
