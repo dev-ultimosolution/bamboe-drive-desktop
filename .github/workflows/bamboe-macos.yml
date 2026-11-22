@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
 # Builds the Bamboe Drive macOS app with upstream's mac-crafter (KDE Craft).
-# Stage 1: unsigned test builds (Apple Silicon and Intel), uploaded as a workflow artifact.
-# Signing, notarisation, the Intel/universal build and the installer follow later.
+# Stage 1: unsigned test builds (Apple Silicon and Intel), uploaded as workflow artifacts.
+# Stage 2: both are merged into one universal app and packed into a disk image (.dmg), still unsigned.
+# Signing, notarisation and the auto-updater follow later.
 name: Bamboe Drive macOS
 
 on:
@@ -113,3 +114,77 @@ jobs:
           name: mac-crafter-logs
           path: ~/Library/Logs/mac-crafter
           if-no-files-found: ignore
+
+  package:
+    name: Universal app + disk image (unsigned)
+    needs: build
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      APP_NAME: Bamboe Drive
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bamboe-drive-macos-*-unsigned
+          path: parts
+
+      - name: Unpack both builds
+        run: |
+          find parts -name '*.zip' -print
+          for arch in arm64 x86_64; do
+            mkdir -p "apps/$arch"
+            ditto -x -k parts/bamboe-drive-macos-$arch-unsigned/*.zip "apps/$arch"
+            test -d "apps/$arch/$APP_NAME.app"
+          done
+
+      - name: Merge into a universal app
+        run: |
+          python3 admin/osx/make_universal.py "apps/x86_64/$APP_NAME.app" "apps/arm64/$APP_NAME.app" universal | tee merge.log
+          if grep -q "Could not merge" merge.log; then echo "Some binaries exist for one architecture only"; grep "Could not merge" merge.log; exit 1; fi
+          APP="universal/$APP_NAME.app"
+          for f in "$APP/Contents/MacOS/"*; do
+            file "$f" | grep -q "Mach-O" || continue
+            echo "$(basename "$f"): $(lipo -archs "$f")"
+            lipo -archs "$f" | grep -q arm64 && lipo -archs "$f" | grep -q x86_64 || { echo "$f is not universal"; exit 1; }
+          done
+
+      # Merging invalidates the linker signatures; Apple Silicon refuses to run unsigned code,
+      # so sign ad hoc (no identity). Real signing replaces this later.
+      - name: Ad hoc sign
+        run: |
+          APP="universal/$APP_NAME.app"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --verbose=2 "$APP"
+
+      - name: Create disk image
+        run: |
+          APP="universal/$APP_NAME.app"
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")
+          BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Contents/Info.plist")
+          DMG="BamboeDrive-$VERSION.$BUILD-macos-universal-unsigned.dmg"
+          brew install create-dmg
+          # create-dmg arranges the window with Finder, which can fail on a CI runner; fall back to a plain image.
+          if ! create-dmg --volname "$APP_NAME" --filesystem APFS --app-drop-link 513 37 --window-size 787 276 "$DMG" "$APP"; then
+            echo "create-dmg failed, building a plain disk image"
+            rm -f "$DMG"
+            mkdir stage
+            cp -a "$APP" stage/
+            ln -s /Applications stage/Applications
+            hdiutil create -volname "$APP_NAME" -srcfolder stage -fs APFS -format UDZO "$DMG"
+          fi
+          hdiutil verify "$DMG"
+          ls -la "$DMG"
+          shasum -a 256 "$DMG"
+          echo "DMG=$DMG" >> "$GITHUB_ENV"
+
+      - name: Upload disk image
+        uses: actions/upload-artifact@v4
+        with:
+          name: bamboe-drive-macos-universal-unsigned-dmg
+          path: ${{ env.DMG }}
+          if-no-files-found: error
+          compression-level: 0

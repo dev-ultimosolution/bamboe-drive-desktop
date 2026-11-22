@@ -20,7 +20,7 @@ fileprivate func buildPackage(appName: String, buildWorkPath: String, productPat
     let packageFile = "\(appName).pkg"
     let pkgprojPath = "\(buildWorkPath)/admin/osx/macosx.pkgproj"
 
-    guard await shell("packagesutil --file \(pkgprojPath) set project name \(appName)") == 0 else {
+    guard await shell("packagesutil --file \(pkgprojPath) set project name \"\(appName)\"") == 0 else {
         throw PackagingError.projectNameSettingError("Could not set project name in pkgproj!")
     }
     guard await shell("packagesbuild -v --build-folder \(productPath) -F \(productPath) \(pkgprojPath)") == 0 else {
@@ -131,7 +131,7 @@ func createDmgForAppBundle(
         .appendingPathExtension("dmg")
         .path
 
-    guard await shell("create-dmg --volname \(appName) --filesystem APFS --app-drop-link 513 37 --window-size 787 276 \"\(dmgFilePath)\" \"\(appBundlePath)\"") == 0 else {
+    guard await shell("create-dmg --volname \"\(appName)\" --filesystem APFS --app-drop-link 513 37 --window-size 787 276 \"\(dmgFilePath)\" \"\(appBundlePath)\"") == 0 else {
         throw PackagingError.packageCreateDmgFailed("Command failed.")
     }
 
