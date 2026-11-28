@@ -592,6 +592,14 @@ void Systray::setupContextMenu()
         _contextMenu->addAction(tr("Open %1 Desktop", "Open Nextcloud main window. Placeholer will be the application name. Please keep it.").arg(APPLICATION_NAME), this, [this]{ showActivitiesWindow(); });
     }
 
+    // Bamboe: open Bamboe Drive in the browser ("Open on web", as in other sync apps).
+    auto webAction = _contextMenu->addAction(tr("Open %1 on web").arg(Theme::instance()->appNameGUI()), this, [] {
+        if (const auto userModel = UserModel::instance()) {
+            userModel->openCurrentAccountServer();
+        }
+    });
+    webAction->setVisible(!AccountManager::instance()->accounts().isEmpty());
+
     auto pauseAction = _contextMenu->addAction(tr("Pause sync"), this, &Systray::slotPauseAllFolders);
     auto resumeAction = _contextMenu->addAction(tr("Resume sync"), this, &Systray::slotUnpauseAllFolders);
     _contextMenu->addAction(tr("Settings"), this, &Systray::openSettings);
@@ -599,6 +607,9 @@ void Systray::setupContextMenu()
     _contextMenu->addAction(tr("Exit %1").arg(Theme::instance()->appNameGUI()), this, &Systray::shutdown);
 
     connect(_contextMenu, &QMenu::aboutToShow, [=] {
+        // The menu is built once at startup; an account added later must still show the web entry.
+        webAction->setVisible(!AccountManager::instance()->accounts().isEmpty());
+
         const auto folders = FolderMan::instance()->map();
 
         const auto allPaused = std::all_of(std::cbegin(folders), std::cend(folders), [](Folder *f) { return f->syncPaused(); });
